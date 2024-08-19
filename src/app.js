@@ -24,6 +24,14 @@ app.use(cookieParser());
 app.use("/api", webhook);
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send(`
+    <div style="font-family: Arial, sans-serif; text-align: center; margin-top: 50px;">
+      <h1>MotoAPI</h1>
+    </div>
+  `);
+});
+
 app.use("/api", Pedidos);
 app.use("/api/auth", authRoutes);
 app.use("/api", productosRoutes);
