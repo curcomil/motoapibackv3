@@ -14,7 +14,7 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: "https://motoapiv3.vercel.app/",
+    origin: "https://motoapiv3.vercel.app",
   })
 );
 
