@@ -5,7 +5,6 @@ import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
 import productosRoutes from "./routes/products.routes.js";
 import Pedidos from "./routes/pedidos.routes.js";
-import { FRONTEND_URL } from "./config.js";
 import pasarela from "./libs/mercadopago.js";
 import webhook from "./libs/webhook.js";
 import Order from "./routes/order.routes.js";
@@ -15,7 +14,7 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: FRONTEND_URL,
+    origin: "https://motoapiv3.vercel.app/",
   })
 );
 
