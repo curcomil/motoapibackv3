@@ -65,6 +65,7 @@ export const login = async (req, res) => {
       res.cookie("isadmin", userFound.isAdmin, {
         sameSite: "none",
         secure: true,
+        domain: ".motoapiv3.vercel.app",
       });
     }
 
