@@ -162,25 +162,37 @@ export const reduceProductStock = async (req, res) => {
 
   try {
     const product = await Product.findById(id);
-
     if (!product) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    if (product.stock < quantity) {
+    // Convertir quantity a número
+    const cantidadCompradaNumber = parseInt(quantity, 10);
+
+    // Verificar si quantity es un número válido
+    if (isNaN(cantidadCompradaNumber)) {
+      return res
+        .status(400)
+        .json({ message: "Cantidad comprada no es válida" });
+    }
+
+    product.stock -= cantidadCompradaNumber;
+
+    if (product.stock < 0) {
       return res.status(400).json({ message: "Stock insuficiente" });
     }
 
-    product.stock -= quantity;
-
     await product.save();
 
-    res.status(200).json({ message: "Stock reducido con éxito", product });
+    res
+      .status(200)
+      .json({ message: "Stock actualizado correctamente", product });
   } catch (error) {
-    console.error("Error al reducir el stock:", error);
-    res.status(500).json({ message: "Error al reducir el stock", error });
+    console.error("Error al actualizar el stock:", error);
+    res.status(500).json({ message: "Error al actualizar el stock", error });
   }
 };
+
 // Eliminar un producto por su ID
 export const deleteProductById = async (req, res) => {
   const { id } = req.params;

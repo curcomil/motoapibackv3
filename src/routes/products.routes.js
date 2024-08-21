@@ -15,8 +15,7 @@ import {
 import { auth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ dest: "uploads/" });
 
 router.post("/newproduct", upload.single("image"), async (req, res) => {
   const { name, price, stock, description, category, subcategory } = req.body;
@@ -27,11 +26,11 @@ router.post("/newproduct", upload.single("image"), async (req, res) => {
       .send({ success: false, message: "Archivo no proporcionado" });
   }
 
-  const fileBuffer = req.file.buffer;
+  const filePath = req.file.path;
   const fileName = req.file.originalname;
 
   try {
-    const result = await uploadToS3(fileBuffer, fileName);
+    const result = await uploadToS3(filePath, fileName);
 
     if (result.success) {
       const newProduct = new Product({
@@ -73,5 +72,6 @@ router.post(
 );
 router.put("/products/:id", updateProductById);
 router.delete("/products/:id", deleteProductById);
-router.put("/products/:id", reduceProductStock);
+router.put("/products/:id/reduce-stock", reduceProductStock);
+
 export default router;
