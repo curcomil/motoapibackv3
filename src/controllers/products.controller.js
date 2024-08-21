@@ -158,31 +158,37 @@ export const updateProductById = async (req, res) => {
 // Actualizar la cantidad de stock después de una compra exitosa
 export const reduceProductStock = async (req, res) => {
   const { id } = req.params;
-  const { cantidadComprada } = req.body;
+  const { quantity } = req.body; // La cantidad que se va a reducir del stock
+
+  if (!quantity || quantity <= 0) {
+    return res.status(400).json({ message: "Cantidad inválida" });
+  }
 
   try {
+    // Encuentra el producto por ID
     const product = await Product.findById(id);
+
     if (!product) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    product.stock -= cantidadComprada;
-
-    if (product.stock < 0) {
+    // Verifica si el stock es suficiente
+    if (product.stock < quantity) {
       return res.status(400).json({ message: "Stock insuficiente" });
     }
 
+    // Reduce el stock
+    product.stock -= quantity;
+
+    // Guarda los cambios en la base de datos
     await product.save();
 
-    res
-      .status(200)
-      .json({ message: "Stock actualizado correctamente", product });
+    res.status(200).json({ message: "Stock actualizado con éxito", product });
   } catch (error) {
-    console.error("Error al actualizar el stock:", error);
-    res.status(500).json({ message: "Error al actualizar el stock", error });
+    console.error("Error al reducir el stock:", error);
+    res.status(500).json({ message: "Error al reducir el stock", error });
   }
 };
-
 // Eliminar un producto por su ID
 export const deleteProductById = async (req, res) => {
   const { id } = req.params;
