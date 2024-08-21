@@ -1,202 +1,233 @@
-import Product from "../models/products.model.js";
-import mongoose from "mongoose";
+import User from "../models/user.model.js";
+import jwt from "jsonwebtoken";
+import { TOKEN_SECRET } from "../config.js";
+import { createAccessToken } from "../libs/jwt.js";
+import bcrypt from "bcryptjs";
 
-// Obtener todos los productos
-export const GetProducts = async (req, res) => {
+export const register = async (req, res) => {
   try {
-    const productsres = await Product.find();
-    res.status(200).json(productsres);
-  } catch (error) {
-    res.status(500).json({ message: "Error al obtener los productos", error });
-  }
-};
+    const { username, email, password } = req.body;
 
-// Obtener un producto por su ID
-export const GetProductById = async (req, res) => {
-  try {
-    const productId = req.query.id;
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
-    res.status(200).json(product);
-  } catch (error) {
-    res.status(500).json({ message: "Error al obtener el producto", error });
-  }
-};
+    const userFound = await User.findOne({ email });
 
-// Añadir una reseña a un producto
-export const addReview = async (req, res) => {
-  const { productId } = req.params;
-  const { opinion, rating } = req.body;
+    if (userFound)
+      return res.status(400).json({ message: ["The email is already in use"] });
 
-  try {
-    const product = await Product.findById(productId);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    if (!product) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
-
-    const newReview = {
-      author: req.user._id,
-      username: req.user.username,
-      opinion,
-      rating,
-    };
-
-    product.reviews.push(newReview);
-
-    await product.save();
-
-    res.status(200).json({ message: "Reseña añadida con éxito", product });
-  } catch (error) {
-    console.error("Error al agregar la reseña:", error);
-    res.status(500).json({ message: "Error al agregar la reseña", error });
-  }
-};
-
-// Añadir una pregunta a un producto
-export const addquestion = async (req, res) => {
-  const { productId } = req.params;
-  const { body } = req.body;
-
-  try {
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
-
-    const newquestion = {
-      author: req.user.username,
-      body,
-    };
-
-    product.questions.push(newquestion);
-    await product.save();
-
-    res.status(200).json({ message: "Pregunta añadida con éxito" });
-  } catch (error) {
-    console.error("Error al agregar la pregunta:", error);
-    res.status(500).json({ message: "Error al agregar la pregunta", error });
-  }
-};
-
-// Añadir una respuesta a una pregunta existente
-export const addResponse = async (req, res) => {
-  const { productId, questionId } = req.params;
-  const { response } = req.body;
-
-  // Validar parámetros de entrada
-  if (!productId || !questionId) {
-    return res
-      .status(400)
-      .json({ message: "ID de producto o pregunta no proporcionados" });
-  }
-
-  // Validar formato de ObjectId
-  if (
-    !mongoose.Types.ObjectId.isValid(productId) ||
-    !mongoose.Types.ObjectId.isValid(questionId)
-  ) {
-    return res
-      .status(400)
-      .json({ message: "IDs proporcionados no son válidos" });
-  }
-
-  if (!response) {
-    return res.status(400).json({ message: "Respuesta no proporcionada" });
-  }
-
-  try {
-    // Buscar el producto por ID
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
-
-    // Buscar la pregunta dentro del producto
-    const question = product.questions.id(questionId);
-    if (!question) {
-      return res.status(404).json({ message: "Pregunta no encontrada" });
-    }
-
-    // Asignar la respuesta a la pregunta
-    question.response = response;
-
-    // Guardar los cambios en el producto
-    await product.save();
-
-    // Responder con éxito
-    res.status(200).json({ message: "Respuesta añadida con éxito" });
-  } catch (error) {
-    console.error("Error al agregar la respuesta:", error);
-    res.status(500).json({ message: "Error al agregar la respuesta", error });
-  }
-};
-
-// Actualizar un producto por su ID
-export const updateProductById = async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
-
-  try {
-    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
-      new: true,
+    const newUser = new User({
+      username,
+      email,
+      password: passwordHash,
     });
 
-    if (!updatedProduct) {
-      return res.status(404).json({ message: "Producto no encontrado" });
-    }
+    const userSaved = await newUser.save();
 
-    res.status(200).json(updatedProduct);
+    const token = await createAccessToken({ id: userSaved._id });
+
+    res.cookie("token", token, {
+      httpOnly: process.env.NODE_ENV !== "development",
+      secure: true,
+      sameSite: "none",
+    });
+
+    res.json({
+      id: userSaved._id,
+      username: userSaved.username,
+      email: userSaved.email,
+    });
   } catch (error) {
-    console.error("Error al actualizar el producto:", error);
-    res.status(500).json({ message: "Error al actualizar el producto", error });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Actualizar la cantidad de stock después de una compra exitosa
-export const reduceProductStock = async (req, res) => {
-  const { id } = req.params;
-  const { cantidadComprada } = req.body;
-
+export const login = async (req, res) => {
   try {
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ message: "Producto no encontrado" });
+    const { email, password } = req.body;
+    const userFound = await User.findOne({ email });
+
+    if (!userFound)
+      return res.status(400).json({ message: ["The email does not exist"] });
+
+    const isMatch = await bcrypt.compare(password, userFound.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: ["The password is incorrect"] });
     }
 
-    product.stock -= cantidadComprada;
+    const token = await createAccessToken({ id: userFound._id });
 
-    if (product.stock < 0) {
-      return res.status(400).json({ message: "Stock insuficiente" });
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+    });
+    if (userFound.isAdmin == true) {
+      res.cookie("isadmin", userFound.isAdmin, {
+        sameSite: "none",
+        secure: true,
+        domain: ".motoapiv3.vercel.app",
+      });
     }
 
-    await product.save();
-
-    res
-      .status(200)
-      .json({ message: "Stock actualizado correctamente", product });
+    res.json({
+      id: userFound._id,
+      username: userFound.username,
+      email: userFound.email,
+      ...(userFound.isAdmin !== undefined && { isAdmin: userFound.isAdmin }),
+    });
   } catch (error) {
-    console.error("Error al actualizar el stock:", error);
-    res.status(500).json({ message: "Error al actualizar el stock", error });
+    return res.status(500).json({ message: error.message });
   }
 };
 
-// Eliminar un producto por su ID
-export const deleteProductById = async (req, res) => {
-  const { id } = req.params;
+export const verifyToken = async (req, res) => {
+  const { token } = req.cookies;
+  if (!token) return res.send(false);
 
+  jwt.verify(token, TOKEN_SECRET, async (error, user) => {
+    if (error) return res.sendStatus(401);
+
+    const userFound = await User.findById(user.id);
+    if (!userFound) return res.sendStatus(401);
+
+    return res.json({
+      id: userFound._id,
+      username: userFound.username,
+      email: userFound.email,
+    });
+  });
+};
+
+export const logout = async (req, res) => {
+  res.cookie("token", "", {
+    httpOnly: true,
+    secure: true,
+    expires: new Date(0),
+    sameSite: "none",
+  });
+
+  if (req.cookies.isadmin) {
+    res.cookie("isadmin", "", {
+      secure: true,
+      expires: new Date(0),
+      sameSite: "none",
+    });
+  }
+
+  return res.status(200).json({ message: "Logged out successfully" });
+};
+
+export const getUserProfile = async (req, res) => {
   try {
-    const deletedProduct = await Product.findByIdAndDelete(id);
+    const { token } = req.cookies;
 
-    if (!deletedProduct) {
-      return res.status(404).json({ message: "Producto no encontrado" });
+    // Verificar si el token existe
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    res.status(200).json({ message: "Producto eliminado con éxito" });
+    // Verificar y decodificar el token
+    jwt.verify(token, TOKEN_SECRET, async (error, user) => {
+      if (error) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      try {
+        // Obtener el usuario de la base de datos
+        const userFound = await User.findById(user.id);
+        if (!userFound) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Devolver los datos del usuario
+        return res.json({
+          id: userFound._id,
+          nombre: userFound.nombre,
+          apellido: userFound.apellido,
+          nacionalidad: userFound.nacionalidad,
+          celular: userFound.celular,
+          cp: userFound.cp,
+          ciudad: userFound.ciudad,
+          calle: userFound.calle,
+          delegacion: userFound.delegacion,
+          referencias: userFound.referencias,
+        });
+      } catch (error) {
+        return res.status(500).json({ message: error.message });
+      }
+    });
   } catch (error) {
-    console.error("Error al eliminar el producto:", error);
-    res.status(500).json({ message: "Error al eliminar el producto", error });
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+export const editUser = async (req, res) => {
+  try {
+    const {
+      nombre,
+      apellido,
+      nacionalidad,
+      celular,
+      cp,
+      ciudad,
+      calle,
+      delegacion,
+      referencias,
+    } = req.body;
+    const { token } = req.cookies;
+
+    // Verificar si hay un token presente en las cookies
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Verificar y decodificar el token
+    jwt.verify(token, TOKEN_SECRET, async (error, user) => {
+      if (error) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      try {
+        // Actualizar el usuario en la base de datos
+        const updatedUser = await User.findByIdAndUpdate(
+          user.id,
+          {
+            nombre,
+            apellido,
+            nacionalidad,
+            celular,
+            cp,
+            ciudad,
+            calle,
+            delegacion,
+            referencias,
+            updatedAt: new Date(), // Actualiza la fecha de actualización
+          },
+          { new: true } // Devuelve el documento actualizado
+        );
+
+        if (!updatedUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Devolver los datos actualizados del usuario
+        return res.json({
+          id: updatedUser._id,
+          nombre: updatedUser.nombre,
+          apellido: updatedUser.apellido,
+          nacionalidad: updatedUser.nacionalidad,
+          celular: updatedUser.celular,
+          cp: updatedUser.cp,
+          ciudad: updatedUser.ciudad,
+          calle: updatedUser.calle,
+          delegacion: updatedUser.delegacion,
+          referencias: updatedUser.referencias,
+        });
+      } catch (error) {
+        return res.status(500).json({ message: error.message });
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
