@@ -1,6 +1,7 @@
 import Product from "../models/products.model.js";
 import mongoose from "mongoose";
 
+// Obtener todos los productos
 export const GetProducts = async (req, res) => {
   try {
     const productsres = await Product.find();
@@ -10,6 +11,7 @@ export const GetProducts = async (req, res) => {
   }
 };
 
+// Obtener un producto por su ID
 export const GetProductById = async (req, res) => {
   try {
     const productId = req.query.id;
@@ -23,6 +25,7 @@ export const GetProductById = async (req, res) => {
   }
 };
 
+// Añadir una reseña a un producto
 export const addReview = async (req, res) => {
   const { productId } = req.params;
   const { opinion, rating } = req.body;
@@ -52,6 +55,7 @@ export const addReview = async (req, res) => {
   }
 };
 
+// Añadir una pregunta a un producto
 export const addquestion = async (req, res) => {
   const { productId } = req.params;
   const { body } = req.body;
@@ -77,6 +81,7 @@ export const addquestion = async (req, res) => {
   }
 };
 
+// Añadir una respuesta a una pregunta existente
 export const addResponse = async (req, res) => {
   const { productId, questionId } = req.params;
   const { response } = req.body;
@@ -129,6 +134,7 @@ export const addResponse = async (req, res) => {
   }
 };
 
+// Actualizar un producto por su ID
 export const updateProductById = async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
@@ -146,6 +152,34 @@ export const updateProductById = async (req, res) => {
   } catch (error) {
     console.error("Error al actualizar el producto:", error);
     res.status(500).json({ message: "Error al actualizar el producto", error });
+  }
+};
+
+// Actualizar la cantidad de stock después de una compra exitosa
+export const reduceProductStock = async (req, res) => {
+  const { id } = req.params;
+  const { cantidadComprada } = req.body;
+
+  try {
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    product.stock -= cantidadComprada;
+
+    if (product.stock < 0) {
+      return res.status(400).json({ message: "Stock insuficiente" });
+    }
+
+    await product.save();
+
+    res
+      .status(200)
+      .json({ message: "Stock actualizado correctamente", product });
+  } catch (error) {
+    console.error("Error al actualizar el stock:", error);
+    res.status(500).json({ message: "Error al actualizar el stock", error });
   }
 };
 
