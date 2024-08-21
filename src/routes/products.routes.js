@@ -10,6 +10,7 @@ import {
   updateProductById,
   deleteProductById,
   addResponse,
+  reduceProductStock,
 } from "../controllers/products.controller.js";
 import { auth } from "../middlewares/auth.middleware.js";
 
@@ -72,4 +73,5 @@ router.post(
 );
 router.put("/products/:id", updateProductById);
 router.delete("/products/:id", deleteProductById);
+router.put("/products/:id", reduceProductStock);
 export default router;
