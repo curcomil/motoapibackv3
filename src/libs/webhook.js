@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import Stripe from "stripe";
 import express from "express";
 import Order from "../models/order.model.js";
+import Product from "../models/products.model.js";
 
 dotenv.config();
 const router = Router();
@@ -45,7 +46,15 @@ router.post(
 
           await newOrder.save();
           console.log("Orden añadida a la base de datos con éxito:", newOrder);
-          response.status(200).send("Orden guardada con éxito");
+
+          // Reducir el stock de cada producto en la orden
+          for (const item of data.items) {
+            await reduceProductStock(item.id, item.quantity);
+          }
+
+          response
+            .status(200)
+            .send("Orden guardada con éxito y stock actualizado");
         } catch (dbError) {
           console.error(
             "Error al conectar o guardar en la base de datos:",
@@ -67,3 +76,33 @@ router.post(
 );
 
 export default router;
+
+// Función para reducir el stock de un producto
+const reduceProductStock = async (id, quantity) => {
+  try {
+    const product = await Product.findById(id);
+    if (!product) {
+      throw new Error("Producto no encontrado");
+    }
+
+    // Convertir quantity a número
+    const cantidadCompradaNumber = parseInt(quantity, 10);
+
+    // Verificar si quantity es un número válido
+    if (isNaN(cantidadCompradaNumber)) {
+      throw new Error("Cantidad comprada no es válida");
+    }
+
+    product.stock -= cantidadCompradaNumber;
+
+    if (product.stock < 0) {
+      throw new Error("Stock insuficiente");
+    }
+
+    await product.save();
+    console.log(`Stock del producto ${id} actualizado correctamente`);
+  } catch (error) {
+    console.error("Error al actualizar el stock:", error.message);
+    throw error; // Lanza el error para que se maneje en el catch del webhook
+  }
+};
