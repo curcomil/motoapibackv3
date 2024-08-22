@@ -47,9 +47,13 @@ router.post(
           await newOrder.save();
           console.log("Orden añadida a la base de datos con éxito:", newOrder);
 
-          for (const item of data.items) {
-            console.log(`Item procesado: `, item);
-            await reduceProductStock(item.itemId, item.cantidad);
+          try {
+            for (const item of data.items) {
+              console.log(`Item procesado: `, item);
+              await reduceProductStock(item.itemId, item.cantidad);
+            }
+          } catch (err) {
+            console.error("Error en el ciclo for:", err.message);
           }
 
           response
