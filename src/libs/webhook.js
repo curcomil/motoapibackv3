@@ -48,7 +48,7 @@ router.post(
           console.log("Orden añadida a la base de datos con éxito:", newOrder);
 
           // Reducir el stock de cada producto en la orden
-          for (const item of data.item.items) {
+          for (const item of data.items.items) {
             await reduceProductStock(item.itemId, item.cantidad);
           }
 
