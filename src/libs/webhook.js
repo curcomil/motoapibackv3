@@ -49,7 +49,7 @@ router.post(
 
           // Reducir el stock de cada producto en la orden
           for (const item of data.items) {
-            await reduceProductStock(item.itemId, item.quantity);
+            await reduceProductStock(item.itemId, item.cantidad);
           }
 
           response
